@@ -13,10 +13,10 @@ class MusicCog(commands.Cog):
         self.currently_playing = {}
 
     def extract_stream_url(self, url):
-        """Extrait l'URL de streaming depuis YouTube avec client Android Music"""
+        """Extrait l'URL de streaming depuis YouTube avec client iOS"""
         ydl_opts = {
             'format': 'bestaudio/best',
-            'extractor-args': 'youtube:player_client=android_music',
+            'extractor-args': 'youtube:player_client=ios',  # iOS contourne les restrictions
             'quiet': True,
             'no_warnings': True,
         }
