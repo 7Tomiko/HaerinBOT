@@ -3,6 +3,15 @@ import random
 from discord.ext import commands
 from yt_dlp import YoutubeDL
 
+
+def get_champions_list():
+        url = "https://ddragon.leagueoflegends.com/cdn/13.24.1/data/fr_FR/champion.json"
+        response = requests.get(url)
+        data = response.json()
+        champions = list(data['data'].keys())
+        return champions
+
+
 class CommandesCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -65,3 +74,4 @@ class CommandesCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(CommandesCog(bot))
+
