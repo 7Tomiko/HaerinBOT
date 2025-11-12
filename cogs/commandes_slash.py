@@ -6,14 +6,6 @@ import random
 import os
 import requests
 
-#Commande LoL
-def get_champions_list():
-        url = "https://ddragon.leagueoflegends.com/cdn/13.24.1/data/fr_FR/champion.json"
-        response = requests.get(url)
-        data = response.json()
-        champions = list(data['data'].keys())
-        return champions
-#Fin commande LoL
 
 class SlashCog(commands.Cog):
     def __init__(self, bot):
@@ -37,3 +29,4 @@ class SlashCog(commands.Cog):
 async def setup(bot):
 
     await bot.add_cog(SlashCog(bot))
+
