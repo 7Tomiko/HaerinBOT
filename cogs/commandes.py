@@ -15,6 +15,17 @@ class CommandesCog(commands.Cog):
         await context.send(file=fichier)
 
     @commands.command()
+    async def champions(self, ctx):
+        champions = get_champions_list()
+        champion_list = ", ".join(champions)
+        # Pour éviter d'envoyer trop de texte, on coupe si nécessaire
+        chunks = [champion_list[i:i+1900] for i in range(0, len(champion_list), 1900)]
+        for chunk in chunks:
+            await ctx.send(chunk)
+        z = random.choice(champions)
+        await ctx.send(f"Champion aléatoire à ban est : {z}")
+
+    @commands.command()
     async def reseaux(self, context):
         insta = discord.utils.get(self.bot.emojis, name='logoInsta')
         twit = discord.utils.get(self.bot.emojis, name='logoX')
@@ -52,4 +63,5 @@ class CommandesCog(commands.Cog):
             await ctx.send("❌ Impossible d'envoyer un message privé à cet utilisateur.")
 
 async def setup(bot):
+
     await bot.add_cog(CommandesCog(bot))
