@@ -18,17 +18,6 @@ def get_champions_list():
 class SlashCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-    
-    @commands.command()
-    async def champions(self, ctx):
-        champions = get_champions_list()
-        champion_list = ", ".join(champions)
-        # Pour éviter d'envoyer trop de texte, on coupe si nécessaire
-        chunks = [champion_list[i:i+1900] for i in range(0, len(champion_list), 1900)]
-        for chunk in chunks:
-            await ctx.send(chunk)
-        z = random.choice(champions)
-        await ctx.send(f"Champion aléatoire à ban est : {z}")
 
     @app_commands.command()
     async def lol(self, interaction: discord.Interaction, qui: str, role: str):
@@ -46,4 +35,5 @@ class SlashCog(commands.Cog):
             await interaction.response.send_message("Aucune combinaison correspondante trouvée.", ephemeral=True)
         
 async def setup(bot):
+
     await bot.add_cog(SlashCog(bot))
