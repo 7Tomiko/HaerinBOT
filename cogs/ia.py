@@ -12,7 +12,7 @@ if not GOOGLE_API_KEY:
     print("⚠️ ATTENTION : La clé GEMINI_API_KEY est introuvable dans le fichier .env !")
 
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('models/gemini-2.0-flash')
 
 class IACog(commands.Cog):
     def __init__(self, bot):
