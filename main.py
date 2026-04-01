@@ -4,6 +4,7 @@ import discord
 from discord.ext import commands
 from keep_alive import keep_alive
 import shutil
+import asyncio
 
 if os.path.exists("./temp"):
     shutil.rmtree("./temp")
@@ -15,14 +16,13 @@ token = os.getenv("DISCORD_TOKEN")
 class MonBot(commands.Bot):
     async def setup_hook(self):
         extensions = ['commandes', 'commandes_slash', 'moderation', 'musique', 'ia']
-        
         for extension in extensions:
             try:
                 await self.load_extension(f'cogs.{extension}')
                 print(f"✅ Extension {extension} chargée.")
             except Exception as e:
-                print(f"❌ Erreur lors du chargement de {extension}: {e}")
-                
+                print(f"❌ Erreur sur {extension}: {e}")
+        
         await self.tree.sync()
         print("⚡ Commandes slash synchronisées !")
 
@@ -30,4 +30,5 @@ intents = discord.Intents.all()
 bot = MonBot(command_prefix='*', intents=intents)
 
 keep_alive()
-bot.run(token=token)
+
+bot.run(token)
