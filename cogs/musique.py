@@ -5,116 +5,80 @@ from yt_dlp import YoutubeDL
 import asyncio
 from collections import defaultdict
 
-
 class MusicCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.queues = defaultdict(asyncio.Queue)
         self.currently_playing = {}
 
-    def extract_stream_url(self, url):
-        """Extrait l'URL de streaming depuis YouTube avec client Android Music"""
+    def extract_stream_url(self, query):
         ydl_opts = {
             'format': 'bestaudio/best',
-            'extractor-args': 'youtube:player_client=android_music',
+            'default_search': 'scsearch',
             'quiet': True,
             'no_warnings': True,
         }
-        
         try:
             with YoutubeDL(ydl_opts) as ydl:
-                print(f"🔍 Extraction de : {url}")
-                info = ydl.extract_info(url, download=False)
-                
-                # Si c'est une playlist, prendre la première vidéo
+                info = ydl.extract_info(query, download=False)
                 if 'entries' in info:
                     info = info['entries'][0]
-                
-                stream_url = info['url']
-                title = info.get("title", "Inconnu")
-                
-                print(f"✅ Titre : {title}")
-                return stream_url, title
-                
+                return info['url'], info.get("title", "Inconnu")
         except Exception as e:
-            print(f"❌ Erreur extraction YouTube: {e}")
             raise e
 
     async def play_next(self, interaction: Interaction, voice_client):
-        """Joue la prochaine musique dans la file d'attente"""
         guild_id = interaction.guild.id
-        
         if self.queues[guild_id].empty():
             self.currently_playing.pop(guild_id, None)
-            print(f"📭 File d'attente vide pour {interaction.guild.name}")
             return
 
         stream_url, title = await self.queues[guild_id].get()
         self.currently_playing[guild_id] = title
 
-        # Options FFmpeg pour un streaming stable avec reconnexion automatique
         ffmpeg_options = {
             'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
             'options': '-vn -b:a 128k'
         }
 
         def after_playing(error):
-            if error:
-                print(f"❌ Erreur audio : {error}")
-            # Passer à la chanson suivante
             asyncio.run_coroutine_threadsafe(
                 self.play_next(interaction, voice_client),
                 self.bot.loop
             )
 
-        voice_client.play(
-            FFmpegPCMAudio(stream_url, **ffmpeg_options), 
-            after=after_playing
-        )
+        voice_client.play(FFmpegPCMAudio(stream_url, **ffmpeg_options), after=after_playing)
         
         try:
             await interaction.followup.send(f"▶️ Lecture : **{title}**")
         except:
-            # Si followup échoue (timeout), essayer un send normal
             pass
 
-    @app_commands.command(name="play", description="Joue une musique depuis YouTube")
-    async def play(self, interaction: Interaction, url: str):
-        """Commande pour jouer une musique"""
+    @app_commands.command(name="play", description="Joue une musique")
+    async def play(self, interaction: Interaction, query: str):
         await interaction.response.defer()
 
-        # Vérifier si l'utilisateur est dans un canal vocal
         if interaction.user.voice is None:
             await interaction.followup.send("❌ Tu dois être dans un salon vocal.", ephemeral=True)
             return
 
-        # Se connecter au canal vocal si pas déjà connecté
         voice_client = interaction.guild.voice_client
         if voice_client is None:
             voice_client = await interaction.user.voice.channel.connect()
-            print(f"🔊 Connecté au canal vocal : {interaction.user.voice.channel.name}")
 
         try:
-            # Extraire l'URL de streaming (peut prendre du temps)
-            stream_url, title = await asyncio.to_thread(self.extract_stream_url, url)
-            
-            # Ajouter à la file d'attente
+            stream_url, title = await asyncio.to_thread(self.extract_stream_url, query)
             await self.queues[interaction.guild.id].put((stream_url, title))
-            print(f"➕ Ajouté à la file : {title}")
 
-            # Si rien n'est en cours de lecture, commencer
             if not voice_client.is_playing() and interaction.guild.id not in self.currently_playing:
                 await self.play_next(interaction, voice_client)
             else:
                 await interaction.followup.send(f"⏳ Ajouté à la file d'attente : **{title}**")
-                
-        except Exception as e:
-            print(f"❌ Erreur complète : {e}")
-            await interaction.followup.send(f"❌ Erreur lors de l'extraction : {e}", ephemeral=True)
+        except Exception:
+            await interaction.followup.send("❌ Erreur lors du chargement de la musique.", ephemeral=True)
 
     @app_commands.command(name="queue", description="Affiche la file d'attente")
     async def queue(self, interaction: Interaction):
-        """Affiche la file d'attente des musiques"""
         guild_id = interaction.guild.id
         queue = list(self.queues[guild_id]._queue)
 
@@ -122,11 +86,9 @@ class MusicCog(commands.Cog):
             await interaction.response.send_message("📭 La file d'attente est vide.", ephemeral=True)
             return
 
-        # Construire le message avec les titres
         msg = "📃 **File d'attente :**\n"
         msg += "\n".join([f"{idx+1}. {title}" for idx, (_, title) in enumerate(queue)])
         
-        # Ajouter la musique en cours
         if guild_id in self.currently_playing:
             msg = f"▶️ **En cours :** {self.currently_playing[guild_id]}\n\n" + msg
         
@@ -134,20 +96,16 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="skip", description="Passe à la musique suivante")
     async def skip(self, interaction: Interaction):
-        """Passe à la chanson suivante"""
         vc = interaction.guild.voice_client
-        
         if vc and vc.is_playing():
-            vc.stop()  # Déclenche automatiquement play_next via le callback
+            vc.stop()
             await interaction.response.send_message("⏭️ Musique suivante...")
         else:
             await interaction.response.send_message("❌ Rien n'est en cours de lecture.", ephemeral=True)
 
     @app_commands.command(name="pause", description="Met la musique en pause")
     async def pause(self, interaction: Interaction):
-        """Met la musique en pause"""
         vc = interaction.guild.voice_client
-        
         if vc and vc.is_playing():
             vc.pause()
             await interaction.response.send_message("⏸️ Musique mise en pause.")
@@ -156,9 +114,7 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="resume", description="Reprend la musique")
     async def resume(self, interaction: Interaction):
-        """Reprend la lecture"""
         vc = interaction.guild.voice_client
-        
         if vc and vc.is_paused():
             vc.resume()
             await interaction.response.send_message("▶️ Reprise de la musique.")
@@ -167,28 +123,20 @@ class MusicCog(commands.Cog):
 
     @app_commands.command(name="stop", description="Arrête la musique et vide la file")
     async def stop(self, interaction: Interaction):
-        """Arrête la musique et déconnecte le bot"""
         vc = interaction.guild.voice_client
-        
         if vc:
-            # Vider la file d'attente
             guild_id = interaction.guild.id
             while not self.queues[guild_id].empty():
                 try:
                     self.queues[guild_id].get_nowait()
                 except:
                     break
-            
             self.currently_playing.pop(guild_id, None)
-            
             vc.stop()
             await vc.disconnect()
             await interaction.response.send_message("⏹️ Musique arrêtée et déconnecté.")
         else:
             await interaction.response.send_message("❌ Je ne suis pas dans un canal vocal.", ephemeral=True)
 
-
-# ⚠️ FONCTION OBLIGATOIRE pour charger le Cog
 async def setup(bot):
     await bot.add_cog(MusicCog(bot))
-    print("✅ MusicCog chargé avec succès")
