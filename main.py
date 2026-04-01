@@ -14,9 +14,17 @@ token = os.getenv("DISCORD_TOKEN")
 
 class MonBot(commands.Bot):
     async def setup_hook(self):
-        for extension in ['commandes', 'commandes_slash', 'moderation', 'musique']:
-            await self.load_extension(f'cogs.{extension}')
+        extensions = ['commandes', 'commandes_slash', 'moderation', 'musique', 'ia']
+        
+        for extension in extensions:
+            try:
+                await self.load_extension(f'cogs.{extension}')
+                print(f"✅ Extension {extension} chargée.")
+            except Exception as e:
+                print(f"❌ Erreur lors du chargement de {extension}: {e}")
+                
         await self.tree.sync()
+        print("⚡ Commandes slash synchronisées !")
 
 intents = discord.Intents.all()
 bot = MonBot(command_prefix='*', intents=intents)
