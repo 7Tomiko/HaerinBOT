@@ -12,13 +12,13 @@ class IA(commands.Cog):
         self.bot = bot
         self.client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
-    @app_commands.command(name="ask", description="Pose une question à Haerin (Version 2026)")
+    @app_commands.command(name="ask", description="Pose une question à Haerin")
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
 
         try:
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash', 
+                model='gemini-1.5-flash', 
                 contents=question
             )
             
