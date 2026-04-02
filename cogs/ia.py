@@ -1,43 +1,37 @@
 import discord
-from discord import app_commands, Interaction
 from discord.ext import commands
-import google.generativeai as genai
+from discord import app_commands
 import os
+from google import genai
 from dotenv import load_dotenv
 
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not GOOGLE_API_KEY:
-    print("⚠️ ATTENTION : La clé GEMINI_API_KEY est introuvable dans le fichier .env !")
-
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
-
-class IACog(commands.Cog):
+class IA(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.client = genai.Client(api_key=os.getenv('GEMINI_API_KEY'))
 
-    @app_commands.command(name="ask", description="Pose une question à l'intelligence artificielle Gemini")
-    @app_commands.describe(question="Ta question pour l'IA")
-    async def ask(self, interaction: Interaction, question: str):
+    @app_commands.command(name="ask", description="Pose une question à Haerin (Version 2026)")
+    async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
 
         try:
-            response = await interaction.client.loop.run_in_executor(
-                None, 
-                lambda: model.generate_content(question)
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash', 
+                contents=question
             )
             
-            reponse_texte = response.text
-            if len(reponse_texte) > 1950:
-                reponse_texte = reponse_texte[:1950] + "\n\n*(Réponse tronquée car trop longue pour Discord)*"
+            answer = response.text
             
-            msg = f"**❓ Question :** {question}\n\n**🤖 Réponse :**\n{reponse_texte}"
-            await interaction.followup.send(msg)
+            if len(answer) > 2000:
+                await interaction.followup.send(answer[:1990] + "...")
+            else:
+                await interaction.followup.send(answer)
 
         except Exception as e:
-            await interaction.followup.send(f"❌ Oups, j'ai eu un bug de cerveau : {e}", ephemeral=True)
+            print(f"Erreur IA GenAI: {e}")
+            await interaction.followup.send(f"❌ Oups, mon nouveau cerveau a un souci : {e}")
 
 async def setup(bot):
-    await bot.add_cog(IACog(bot))
+    await bot.add_cog(IA(bot))
