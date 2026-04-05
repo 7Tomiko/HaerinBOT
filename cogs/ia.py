@@ -4,7 +4,8 @@ from discord import app_commands
 import os
 from google import genai
 from dotenv import load_dotenv
-import datetime 
+import datetime
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 
@@ -18,7 +19,8 @@ class IA(commands.Cog):
         await interaction.response.defer()
 
         try:
-            maintenant = datetime.datetime.now().strftime("%d/%m/%Y, et il est %H:%M")
+            fuseau_paris = ZoneInfo("Europe/Paris")
+            maintenant = datetime.datetime.now(fuseau_paris).strftime("%d/%m/%Y, et il est %H:%M")
             
             prompt_enrichi = f"Information système : Nous sommes le {maintenant}.\n\nQuestion de l'utilisateur : {question}"
 
