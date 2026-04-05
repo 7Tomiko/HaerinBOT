@@ -4,6 +4,7 @@ from discord import app_commands
 import os
 from google import genai
 from dotenv import load_dotenv
+import datetime 
 
 load_dotenv()
 
@@ -17,9 +18,13 @@ class IA(commands.Cog):
         await interaction.response.defer()
 
         try:
+            maintenant = datetime.datetime.now().strftime("%d/%m/%Y, et il est %H:%M")
+            
+            prompt_enrichi = f"Information système : Nous sommes le {maintenant}.\n\nQuestion de l'utilisateur : {question}"
+
             response = self.client.models.generate_content(
                 model='gemini-flash-latest', 
-                contents=question
+                contents=prompt_enrichi
             )
             
             answer = response.text
