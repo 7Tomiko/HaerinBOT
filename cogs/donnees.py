@@ -79,7 +79,7 @@ class Donnees(commands.Cog):
             await db.commit()
             
             if cursor.rowcount > 0:
-                await interaction.response.send_message(f"🗑️ L'évènement numéro **{id_event}** a été rayé de la carte (et de la BDD).")
+                await interaction.response.send_message(f"🗑️ L'évènement numéro **{id_event}** a été supprimé.")
             else:
                 await interaction.response.send_message(f"❌ Impossible de trouver un évènement avec l'ID {id_event}.")
 
@@ -94,7 +94,7 @@ class Donnees(commands.Cog):
             )
             await db.commit()
         
-        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté au hit-parade du serveur !")
+        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté aux favoris du serveur !")
 
     @app_commands.command(name="music_top", description="Le top des musiques partagées sur le serveur")
     async def music_top(self, interaction: discord.Interaction):
