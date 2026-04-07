@@ -59,17 +59,18 @@ class Donnees(commands.Cog):
         """Date au format JJ/MM/AAAA"""
         try:
             date_obj = datetime.datetime.strptime(date, "%d/%m/%Y")
+            user_id = str(interaction.user.id)
+            pseudo = interaction.user.display_name
             
             async with aiosqlite.connect(self.db_path) as db:
-                await db.execute(
-                    "INSERT INTO events (titre, date_evenement, createur) VALUES (?, ?, ?)",
-                    (titre, date_obj, interaction.user.display_name)
-                )
+                # Ajout dans utilisateurs puis evenements (nouvelle structure)
+                await db.execute("INSERT OR IGNORE INTO utilisateurs (discord_id, pseudo) VALUES (?, ?)", (user_id, pseudo))
+                await db.execute("INSERT INTO evenements (titre, date_event, organisateur_id) VALUES (?, ?, ?)", (titre, date_obj, user_id))
                 await db.commit()
             
             await interaction.response.send_message(f"✅ Évènement **{titre}** ajouté pour le {date} !")
         except ValueError:
-            await interaction.response.send_message("❌ Format de date invalide. Utilise JJ/MM/AAAA (ex: 25/12/2026)")
+            await interaction.response.send_message("❌ Format de date invalide. Utilise JJ/MM/AAAA.")
 
     @app_commands.command(name="event_liste", description="Voir les prochains évènements")
     async def event_liste(self, interaction: discord.Interaction):
@@ -77,10 +78,14 @@ class Donnees(commands.Cog):
         maintenant = datetime.datetime.now(fuseau_paris)
 
         async with aiosqlite.connect(self.db_path) as db:
-            async with db.execute(
-                "SELECT id, titre, date_evenement, createur FROM events WHERE date_evenement >= ? ORDER BY date_evenement ASC",
-                (maintenant.date(),)
-            ) as cursor:
+            query = """
+                SELECT e.id, e.titre, e.date_event, u.pseudo 
+                FROM evenements e 
+                JOIN utilisateurs u ON e.organisateur_id = u.discord_id 
+                WHERE e.date_event >= ? 
+                ORDER BY e.date_event ASC
+            """
+            async with db.execute(query, (maintenant.date(),)) as cursor:
                 rows = await cursor.fetchall()
 
         if not rows:
@@ -95,9 +100,8 @@ class Donnees(commands.Cog):
 
     @app_commands.command(name="event_supprimer", description="Supprimer un évènement via son ID")
     async def event_supprimer(self, interaction: discord.Interaction, id_event: int):
-        """Supprime une ligne de la base de données de manière propre via la clé primaire"""
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute("DELETE FROM events WHERE id = ?", (id_event,))
+            cursor = await db.execute("DELETE FROM evenements WHERE id = ?", (id_event,))
             await db.commit()
             
             if cursor.rowcount > 0:
@@ -108,23 +112,35 @@ class Donnees(commands.Cog):
 
     @app_commands.command(name="music_log", description="Enregistrer une pépite musicale")
     async def music_log(self, interaction: discord.Interaction, titre: str, artiste: str):
-        """Permet aux membres de partager ce qu'ils écoutent pour créer un classement"""
+        user_id = str(interaction.user.id)
+        pseudo = interaction.user.display_name
+
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute(
-                "INSERT INTO music_history (titre, artiste, user_name, date_ecoute) VALUES (?, ?, ?, ?)",
-                (titre, artiste, interaction.user.display_name, datetime.datetime.now())
-            )
+            await db.execute("INSERT OR IGNORE INTO utilisateurs (discord_id, pseudo) VALUES (?, ?)", (user_id, pseudo))
+            
+            cursor = await db.execute("SELECT id FROM musiques WHERE titre = ? AND artiste = ?", (titre, artiste))
+            music_row = await cursor.fetchone()
+            
+            if music_row:
+                music_id = music_row[0]
+            else:
+                cursor = await db.execute("INSERT INTO musiques (titre, artiste) VALUES (?, ?)", (titre, artiste))
+                music_id = cursor.lastrowid
+                
+            await db.execute("INSERT INTO historique_ecoutes (user_id, musique_id, date_ecoute) VALUES (?, ?, ?)", 
+                             (user_id, music_id, datetime.datetime.now()))
             await db.commit()
         
-        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté aux favoris du serveur !")
+        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté à l'historique !")
 
-    @app_commands.command(name="music_top", description="Le top des musiques partagées sur le serveur")
+    @app_commands.command(name="music_top", description="Le top des musiques du serveur")
     async def music_top(self, interaction: discord.Interaction):
         query = """
-            SELECT titre, artiste, COUNT(*) as nb 
-            FROM music_history 
-            GROUP BY titre, artiste 
-            ORDER BY nb DESC 
+            SELECT m.titre, m.artiste, COUNT(h.id) as nb_ecoutes 
+            FROM historique_ecoutes h 
+            JOIN musiques m ON h.musique_id = m.id 
+            GROUP BY m.id 
+            ORDER BY nb_ecoutes DESC 
             LIMIT 5
         """
         async with aiosqlite.connect(self.db_path) as db:
@@ -132,18 +148,19 @@ class Donnees(commands.Cog):
                 rows = await cursor.fetchall()
 
         if not rows:
-            return await interaction.response.send_message("📉 Pas encore de stats musicales. Utilisez /music_log pour commencer !")
+            return await interaction.response.send_message("📉 Pas encore de stats musicales.")
 
         embed = discord.Embed(title="🏆 Top 5 des pépites du serveur", color=discord.Color.purple())
         for i, row in enumerate(rows, 1):
-            embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (partagé {row[2]} fois)", inline=False)
+            embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (écouté {row[2]} fois)", inline=False)
         
         await interaction.response.send_message(embed=embed)
+
 
     @app_commands.command(name="export_sql", description="[ADMIN] Télécharger le Dump SQL")
     async def export_sql(self, interaction: discord.Interaction):
         try:
-            fichier = discord.File("sauvegarde_bts.sql")
+            fichier = discord.File("sauvegarde_haerin.sql")
             await interaction.response.send_message("📂 Voici le code SQL pour le prof :", file=fichier, ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Erreur, problème du coté serveur : {e}", ephemeral=True)
