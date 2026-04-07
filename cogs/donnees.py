@@ -47,7 +47,7 @@ class Donnees(commands.Cog):
             
             await interaction.response.send_message(f"✅ Évènement **{titre}** ajouté pour le {date} !")
         except ValueError:
-            await interaction.response.send_message("❌ Format de date invalide. Utilise JJ/MM/AAAA")
+            await interaction.response.send_message("❌ Format de date invalide. Utilise JJ/MM/AAAA (ex: 25/12/2026)")
 
     @app_commands.command(name="event_liste", description="Voir les prochains évènements")
     async def event_liste(self, interaction: discord.Interaction):
@@ -56,7 +56,7 @@ class Donnees(commands.Cog):
 
         async with aiosqlite.connect(self.db_path) as db:
             async with db.execute(
-                "SELECT titre, date_evenement, createur FROM events WHERE date_evenement >= ? ORDER BY date_evenement ASC",
+                "SELECT id, titre, date_evenement, createur FROM events WHERE date_evenement >= ? ORDER BY date_evenement ASC",
                 (maintenant.date(),)
             ) as cursor:
                 rows = await cursor.fetchall()
@@ -66,15 +66,27 @@ class Donnees(commands.Cog):
 
         embed = discord.Embed(title="🗓️ Agenda du Serveur", color=discord.Color.gold())
         for row in rows:
-            date_f = datetime.datetime.fromisoformat(row[1]).strftime("%d/%m/%Y")
-            embed.add_field(name=f"{date_f} - {row[0]}", value=f"Organisé par : {row[2]}", inline=False)
+            date_f = datetime.datetime.fromisoformat(row[2]).strftime("%d/%m/%Y")
+            embed.add_field(name=f"[{row[0]}] {date_f} - {row[1]}", value=f"Organisé par : {row[3]}", inline=False)
         
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="event_supprimer", description="Supprimer un évènement via son ID")
+    async def event_supprimer(self, interaction: discord.Interaction, id_event: int):
+        """Supprime une ligne de la base de données de manière propre via la clé primaire"""
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute("DELETE FROM events WHERE id = ?", (id_event,))
+            await db.commit()
+            
+            if cursor.rowcount > 0:
+                await interaction.response.send_message(f"🗑️ L'évènement numéro **{id_event}** a été rayé de la carte (et de la BDD).")
+            else:
+                await interaction.response.send_message(f"❌ Impossible de trouver un évènement avec l'ID {id_event}.")
 
 
     @app_commands.command(name="music_log", description="Enregistrer une pépite musicale")
     async def music_log(self, interaction: discord.Interaction, titre: str, artiste: str):
-        """Permet aux membres de partager ce qu'ils écoutent et crée un classement"""
+        """Permet aux membres de partager ce qu'ils écoutent pour créer un classement"""
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO music_history (titre, artiste, user_name, date_ecoute) VALUES (?, ?, ?, ?)",
@@ -82,7 +94,7 @@ class Donnees(commands.Cog):
             )
             await db.commit()
         
-        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté aux morceaux préférés du serveur !")
+        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté au hit-parade du serveur !")
 
     @app_commands.command(name="music_top", description="Le top des musiques partagées sur le serveur")
     async def music_top(self, interaction: discord.Interaction):
@@ -98,9 +110,9 @@ class Donnees(commands.Cog):
                 rows = await cursor.fetchall()
 
         if not rows:
-            return await interaction.response.send_message("📉 Pas encore de stats musicales.")
+            return await interaction.response.send_message("📉 Pas encore de stats musicales. Utilisez /music_log pour commencer !")
 
-        embed = discord.Embed(title="🏆 Top 5 du serveur", color=discord.Color.purple())
+        embed = discord.Embed(title="🏆 Top 5 des pépites du serveur", color=discord.Color.purple())
         for i, row in enumerate(rows, 1):
             embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (partagé {row[2]} fois)", inline=False)
         
