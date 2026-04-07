@@ -27,10 +27,9 @@ class ModerationCog(commands.Cog):
         deleted = await interaction.channel.purge(limit=amount)
         await interaction.followup.send(f"✅ {len(deleted)} message(s) supprimé(s).", ephemeral=True)
 
-    @commands.command()
-    async def say(self, ctx, *, message: str):
-        await ctx.message.delete()
-        await ctx.send(message) 
+    @app_commands.command()
+    async def say(self, interaction: discord.Interaction, *, message: str):
+        await interaction.response.send_message(message)
 
 async def setup(bot):
     await bot.add_cog(ModerationCog(bot))

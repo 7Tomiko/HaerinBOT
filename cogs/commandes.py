@@ -63,14 +63,6 @@ class CommandesCog(commands.Cog):
         else:
             await context.send("Je ne suis connecté à aucun salon vocal.")
 
-    @commands.command()
-    async def dm(self, ctx, member: discord.Member, *, message: str):
-        try:
-            await member.send(message)
-            await ctx.send(f"✅ Message envoyé à {member.display_name}")
-        except discord.Forbidden:
-            await ctx.send("❌ Impossible d'envoyer un message privé à cet utilisateur.")
-
 async def setup(bot):
 
     await bot.add_cog(CommandesCog(bot))

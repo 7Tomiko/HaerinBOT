@@ -1,3 +1,5 @@
+from flask import ctx
+
 from discord import app_commands, FFmpegPCMAudio
 from discord.ext import commands
 from yt_dlp import YoutubeDL
@@ -25,7 +27,15 @@ class SlashCog(commands.Cog):
             await interaction.response.send_message(f"Le champion aléatoire de {qui} en {role} est : {champ}")
         else:
             await interaction.response.send_message("Aucune combinaison correspondante trouvée.", ephemeral=True)
-        
+
+    @app_commands.command()
+    async def dm(self, interaction: discord.Interaction, member: discord.Member, message: str):
+        try:
+            await member.send(message)
+            await interaction.response.send_message(f"✅ Message envoyé à {member.display_name}", ephemeral=True)
+        except discord.Forbidden:
+            await interaction.response.send_message("❌ Impossible d'envoyer un message privé à cet utilisateur.", ephemeral=True)
+
 async def setup(bot):
 
     await bot.add_cog(SlashCog(bot))
