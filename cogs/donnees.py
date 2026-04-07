@@ -118,5 +118,13 @@ class Donnees(commands.Cog):
         
         await interaction.response.send_message(embed=embed)
 
+    @app_commands.command(name="export_sql", description="[ADMIN] Télécharger le Dump SQL")
+    async def export_sql(self, interaction: discord.Interaction):
+        try:
+            fichier = discord.File("sauvegarde_bts.sql")
+            await interaction.response.send_message("📂 Voici le code SQL pour le prof :", file=fichier, ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Erreur, problème du coté serveur : {e}", ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(Donnees(bot))
