@@ -82,7 +82,7 @@ class Donnees(commands.Cog):
             )
             await db.commit()
         
-        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté au hit-parade du serveur !")
+        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté aux morceaux préférés du serveur !")
 
     @app_commands.command(name="music_top", description="Le top des musiques partagées sur le serveur")
     async def music_top(self, interaction: discord.Interaction):
@@ -100,7 +100,7 @@ class Donnees(commands.Cog):
         if not rows:
             return await interaction.response.send_message("📉 Pas encore de stats musicales.")
 
-        embed = discord.Embed(title="🏆 Top 5 des pépites du serveur", color=discord.Color.purple())
+        embed = discord.Embed(title="🏆 Top 5 du serveur", color=discord.Color.purple())
         for i, row in enumerate(rows, 1):
             embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (partagé {row[2]} fois)", inline=False)
         
