@@ -12,23 +12,45 @@ class Donnees(commands.Cog):
 
     async def cog_load(self):
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    titre TEXT,
-                    date_evenement TIMESTAMP,
-                    createur TEXT
-                )
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS music_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    titre TEXT,
-                    artiste TEXT,
-                    user_name TEXT,
-                    date_ecoute TIMESTAMP
-                )
-            ''')
+            await db.execute("PRAGMA foreign_keys = ON;")
+            
+            await db.execute('''CREATE TABLE IF NOT EXISTS utilisateurs (
+                discord_id VARCHAR(50) PRIMARY KEY,
+                pseudo VARCHAR(100),
+                score_activite INT DEFAULT 0
+            )''')
+
+            await db.execute('''CREATE TABLE IF NOT EXISTS musiques (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titre VARCHAR(150),
+                artiste VARCHAR(150),
+                genre VARCHAR(50) DEFAULT 'Inconnu'
+            )''')
+
+            await db.execute('''CREATE TABLE IF NOT EXISTS evenements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                titre VARCHAR(200),
+                date_event DATETIME,
+                organisateur_id VARCHAR(50),
+                FOREIGN KEY(organisateur_id) REFERENCES utilisateurs(discord_id) ON DELETE CASCADE
+            )''')
+
+            await db.execute('''CREATE TABLE IF NOT EXISTS participations (
+                event_id INTEGER,
+                utilisateur_id VARCHAR(50),
+                PRIMARY KEY (event_id, utilisateur_id),
+                FOREIGN KEY(event_id) REFERENCES evenements(id) ON DELETE CASCADE,
+                FOREIGN KEY(utilisateur_id) REFERENCES utilisateurs(discord_id) ON DELETE CASCADE
+            )''')
+
+            await db.execute('''CREATE TABLE IF NOT EXISTS historique_ecoutes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id VARCHAR(50),
+                musique_id INTEGER,
+                date_ecoute DATETIME,
+                FOREIGN KEY(user_id) REFERENCES utilisateurs(discord_id) ON DELETE CASCADE,
+                FOREIGN KEY(musique_id) REFERENCES musiques(id) ON DELETE CASCADE
+            )''')
             await db.commit()
 
 
