@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 class Donnees(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = "bts_database.db"
+        self.db_path = "haerin_database.db"
 
     async def cog_load(self):
         async with aiosqlite.connect(self.db_path) as db:
