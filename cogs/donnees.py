@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 class Donnees(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = "haerin_database.db"
+        self.db_path = "bts_database.db"
 
     async def cog_load(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -44,10 +44,11 @@ class Donnees(commands.Cog):
             )''')
 
             await db.execute('''CREATE TABLE IF NOT EXISTS historique_ecoutes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id VARCHAR(50),
                 musique_id INTEGER,
+                nb_ecoutes INTEGER DEFAULT 1,
                 date_ecoute DATETIME,
+                PRIMARY KEY (user_id, musique_id),
                 FOREIGN KEY(user_id) REFERENCES utilisateurs(discord_id) ON DELETE CASCADE,
                 FOREIGN KEY(musique_id) REFERENCES musiques(id) ON DELETE CASCADE
             )''')
@@ -56,14 +57,12 @@ class Donnees(commands.Cog):
 
     @app_commands.command(name="event_ajouter", description="Ajouter un évènement au calendrier")
     async def event_ajouter(self, interaction: discord.Interaction, titre: str, date: str):
-        """Date au format JJ/MM/AAAA"""
         try:
             date_obj = datetime.datetime.strptime(date, "%d/%m/%Y")
             user_id = str(interaction.user.id)
             pseudo = interaction.user.display_name
             
             async with aiosqlite.connect(self.db_path) as db:
-                # Ajout dans utilisateurs puis evenements (nouvelle structure)
                 await db.execute("INSERT OR IGNORE INTO utilisateurs (discord_id, pseudo) VALUES (?, ?)", (user_id, pseudo))
                 await db.execute("INSERT INTO evenements (titre, date_event, organisateur_id) VALUES (?, ?, ?)", (titre, date_obj, user_id))
                 await db.commit()
@@ -103,7 +102,6 @@ class Donnees(commands.Cog):
         async with aiosqlite.connect(self.db_path) as db:
             cursor = await db.execute("DELETE FROM evenements WHERE id = ?", (id_event,))
             await db.commit()
-            
             if cursor.rowcount > 0:
                 await interaction.response.send_message(f"🗑️ L'évènement numéro **{id_event}** a été supprimé.")
             else:
@@ -114,6 +112,7 @@ class Donnees(commands.Cog):
     async def music_log(self, interaction: discord.Interaction, titre: str, artiste: str):
         user_id = str(interaction.user.id)
         pseudo = interaction.user.display_name
+        maintenant = datetime.datetime.now()
 
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("INSERT OR IGNORE INTO utilisateurs (discord_id, pseudo) VALUES (?, ?)", (user_id, pseudo))
@@ -127,20 +126,27 @@ class Donnees(commands.Cog):
                 cursor = await db.execute("INSERT INTO musiques (titre, artiste) VALUES (?, ?)", (titre, artiste))
                 music_id = cursor.lastrowid
                 
-            await db.execute("INSERT INTO historique_ecoutes (user_id, musique_id, date_ecoute) VALUES (?, ?, ?)", 
-                             (user_id, music_id, datetime.datetime.now()))
+            upsert_query = """
+                INSERT INTO historique_ecoutes (user_id, musique_id, nb_ecoutes, date_ecoute) 
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(user_id, musique_id) 
+                DO UPDATE SET 
+                    nb_ecoutes = nb_ecoutes + 1,
+                    date_ecoute = excluded.date_ecoute;
+            """
+            await db.execute(upsert_query, (user_id, music_id, maintenant))
             await db.commit()
         
-        await interaction.response.send_message(f"🎶 **{titre}** ({artiste}) a été ajouté à l'historique !")
+        await interaction.response.send_message(f"🎶 Tes stats pour **{titre}** ({artiste}) ont été mises à jour !")
 
     @app_commands.command(name="music_top", description="Le top des musiques du serveur")
     async def music_top(self, interaction: discord.Interaction):
         query = """
-            SELECT m.titre, m.artiste, COUNT(h.id) as nb_ecoutes 
+            SELECT m.titre, m.artiste, SUM(h.nb_ecoutes) as total_ecoutes 
             FROM historique_ecoutes h 
             JOIN musiques m ON h.musique_id = m.id 
             GROUP BY m.id 
-            ORDER BY nb_ecoutes DESC 
+            ORDER BY total_ecoutes DESC 
             LIMIT 5
         """
         async with aiosqlite.connect(self.db_path) as db:
@@ -152,16 +158,15 @@ class Donnees(commands.Cog):
 
         embed = discord.Embed(title="🏆 Top 5 des pépites du serveur", color=discord.Color.purple())
         for i, row in enumerate(rows, 1):
-            embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (écouté {row[2]} fois)", inline=False)
+            embed.add_field(name=f"{i}. {row[0]}", value=f"de **{row[1]}** (écouté {row[2]} fois au total)", inline=False)
         
         await interaction.response.send_message(embed=embed)
-
 
     @app_commands.command(name="export_sql", description="[ADMIN] Télécharger le Dump SQL")
     async def export_sql(self, interaction: discord.Interaction):
         try:
             fichier = discord.File("sauvegarde_haerin.sql")
-            await interaction.response.send_message("📂 Voici le code SQL pour le prof :", file=fichier, ephemeral=True)
+            await interaction.response.send_message("📂 Fichier .sql :", file=fichier, ephemeral=True)
         except Exception as e:
             await interaction.response.send_message(f"❌ Erreur, problème du coté serveur : {e}", ephemeral=True)
 
